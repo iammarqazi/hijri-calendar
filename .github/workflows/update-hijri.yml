@@ -1,5 +1,8 @@
 name: Update Hijri Calendar
 
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: '30 18 * * *'   # 00:00 IST
@@ -46,8 +49,9 @@ METHOD:PUBLISH
               d = today + timedelta(days=i)
               g_date = d.strftime("%d-%m-%Y")
 
-              url = f"https://api.aladhan.com/v1/gToH?date={g_date}"
-              hijri = requests.get(url).json()["data"]["hijri"]
+              hijri = requests.get(
+                  f"https://api.aladhan.com/v1/gToH?date={g_date}"
+              ).json()["data"]["hijri"]
 
               hijri_text = f"{hijri['day']} {hijri['month']['en']} {hijri['year']}"
 
