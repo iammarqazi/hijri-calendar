@@ -28,7 +28,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Generate Hijri Calendar
+      - name: Generate Hijri Calendar (iOS 26 visible)
         run: |
           python - <<'PYCODE'
           import requests
@@ -47,8 +47,43 @@ jobs:
           today = date.today()
           events = []
 
-          for i in range(90):
+          for i in range(90):  # next 90 days
               d = today + timedelta(days=i)
               g_date = d.strftime("%d-%m-%Y")
 
               resp = requests.get(
+                  f"https://api.aladhan.com/v1/gToH?date={g_date}",
+                  timeout=10
+              ).json()
+
+              if "data" not in resp:
+                  continue
+
+              hijri = resp["data"]["hijri"]
+              hijri_text = f"{hijri['day']} {hijri['month']['en']} {hijri['year']}"
+
+              ymd = d.strftime("%Y%m%d")
+
+              # Timed event (00:01–00:02) → ALWAYS visible on iOS 26
+              events.append(
+                  "BEGIN:VEVENT\n"
+                  f"UID:{ymd}@hijri-calendar\n"
+                  f"DTSTAMP:{ymd}T000000Z\n"
+                  f"DTSTART:{ymd}T000100\n"
+                  f"DTEND:{ymd}T000200\n"
+                  f"SUMMARY:🌙 Hijri Date: {hijri_text}\n"
+                  "DESCRIPTION:Auto-updating Hijri calendar\n"
+                  "END:VEVENT\n"
+              )
+
+          with open("hijri.ics", "w") as f:
+              f.write(ICS_HEADER + "".join(events) + ICS_FOOTER)
+          PYCODE
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add hijri.ics
+          git commit -m "Update Hijri calendar (iOS 26 visible)" || exit 0
+          git push
