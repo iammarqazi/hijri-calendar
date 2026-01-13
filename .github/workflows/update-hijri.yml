@@ -1,0 +1,68 @@
+name: Update Hijri Calendar
+
+on:
+  schedule:
+    - cron: '30 18 * * *'   # Runs daily at 00:00 IST
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (master)
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Generate Hijri Calendar
+        run: |
+          python << 'EOF'
+          import requests
+          from datetime import date, timedelta
+
+          ICS_HEADER = """BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Hijri Calendar//Auto Update//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+"""
+
+          ICS_FOOTER = "END:VCALENDAR"
+
+          today = date.today()
+          events = []
+
+          for i in range(90):
+              d = today + timedelta(days=i)
+              g_date = d.strftime("%d-%m-%Y")
+
+              url = f"https://api.aladhan.com/v1/gToH?date={g_date}"
+              hijri = requests.get(url).json()["data"]["hijri"]
+
+              hijri_text = f"{hijri['day']} {hijri['month']['en']} {hijri['year']}"
+
+              ymd = d.strftime("%Y%m%d")
+              ymd_next = (d + timedelta(days=1)).strftime("%Y%m%d")
+
+              events.append(f"""BEGIN:VEVENT
+UID:{ymd}@hijri-calendar
+DTSTAMP:{ymd}T000000Z
+DTSTART;VALUE=DATE:{ymd}
+DTEND;VALUE=DATE:{ymd_next}
+SUMMARY:Hijri Date: {hijri_text}
+DESCRIPTION:Auto-updating Hijri calendar (India)
+END:VEVENT
+""")
+
+          with open("hijri.ics", "w") as f:
+              f.write(ICS_HEADER + "\n".join(events) + ICS_FOOTER)
+          EOF
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add hijri.ics
+          git commit -m "Auto-update Hijri calendar" || exit 0
+          git push
